@@ -1,3 +1,4 @@
+const contract = 
 {
   "contractName": "Archive",
   "abi": [
