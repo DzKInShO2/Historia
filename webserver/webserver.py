@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import os
+import base64
+
 from flask import Flask, render_template, request, jsonify
 
 import requests
@@ -28,7 +30,36 @@ def get_external_contents(web, urls):
         try:
             true_url = url
             if "https" not in true_url or "http" not in true_url or "ftp" not in true_url:
-                true_url = f"{web}/{url}"
+                if web[-1] == "/":
+                    true_url = f"{web}{url}"
+                else:
+                    true_url = f"{web}/{url}"
+
+            res = requests.get(true_url)
+            if res.status_code != 200:
+                continue
+            if res.text is None:
+                continue
+
+            content = base64.b64encode(res.content)
+            content = content.decode("utf-8").replace('\n', '').replace('\r', '')
+            contents[true_url] = content
+        except Exception as e:
+            continue
+
+    return contents
+
+
+def get_external_texts(web, urls):
+    contents = {}
+    for url in urls:
+        try:
+            true_url = url
+            if "https" not in true_url or "http" not in true_url or "ftp" not in true_url:
+                if web[-1] == "/":
+                    true_url = f"{web}{url}"
+                else:
+                    true_url = f"{web}/{url}"
 
             res = requests.get(true_url)
             if res.status_code != 200:
@@ -86,8 +117,8 @@ def archive_page():
     response = {
         "head": str(soup.head).replace("<head>", "").replace("</head>", "").strip(),
         "body": str(soup.body).replace("<body>", "").replace("</body>", "").strip(),
-        "scripts": get_external_contents(web_url, script_urls),
-        "styles": get_external_contents(web_url, style_urls),
+        "scripts": get_external_texts(web_url, script_urls),
+        "styles": get_external_texts(web_url, style_urls),
         "images": get_external_contents(web_url, img_urls)
     }
 
