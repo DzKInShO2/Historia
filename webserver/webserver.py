@@ -2,12 +2,21 @@
 import os
 import base64
 
-from flask import Flask, render_template, request, jsonify
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    send_from_directory
+)
 
 import requests
 from bs4 import BeautifulSoup
 
+UPLOAD_FOLDER = "uploads"
+
 app = Flask(__name__, template_folder=os.path.abspath("pages"))
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 def is_script(tag):
     return tag.get("src") is not None
@@ -82,6 +91,13 @@ def archive_page():
     if request.method == "GET":
         return render_template("archive.html")
 
+    web = request.json.get("web")
+    kind = request.json.get("kind")
+    time = request.json.get("time")
+    if kind is None:
+        return "0"
+    kind = int(kind)
+
     content = None
     try:
         res = requests.get(request.json.get("web"))
@@ -89,40 +105,34 @@ def archive_page():
         if res.status_code != 200:
             return "1"
 
-        content = res.text
+        if int(kind/10) == 3:
+            content = res.content
+        else:
+            content = res.text
+
         if content is None:
             return "2"
     except Exception as e:
         print(f"EXCEPTION: {e}")
         return "3"
 
-    soup = BeautifulSoup(content, "html.parser")
-
-    # Filter SCRIPT with srcs
-
-    # Head external resources
-    script_urls = list(filter(is_script, soup.head.find_all('script')))
-    style_urls  = list(filter(is_style, soup.head.find_all('link')))
-
-    # Body external resources
-    script_urls = [*script_urls, *list(filter(is_script, soup.body.find_all('script')))]
-    style_urls  = [*style_urls, *list(filter(is_style, soup.body.find_all('style')))]
-    img_urls    = soup.body.find_all('img')
-
-    script_urls = [ tag["src"] for tag in script_urls ]
-    style_urls  = [ tag["href"] for tag in style_urls ]
-    img_urls    = [ tag["src"] for tag in img_urls ]
-
-    web_url = request.json.get("web")
-    response = {
-        "head": str(soup.head).replace("<head>", "").replace("</head>", "").strip(),
-        "body": str(soup.body).replace("<body>", "").replace("</body>", "").strip(),
-        "scripts": get_external_texts(web_url, script_urls),
-        "styles": get_external_texts(web_url, style_urls),
-        "images": get_external_contents(web_url, img_urls)
-    }
+    response = {}
+    if int(kind / 10) == 3:
+        filename = f"{time}_{web.replace('://', '_').replace('/', '_')}"
+        with open(f"{UPLOAD_FOLDER}/{filename}", "wb") as f:
+            f.write(content)
+        response["content"] = filename
+    elif kind == 10:
+        response["content"] = content
+    else:
+        soup = BeautifulSoup(content, "html.parser")
+        response["content"] = str(soup.head).strip() + "\n" + str(soup.body).strip()
 
     return jsonify(response)
+
+@app.route("/archive/<name>")
+def get_archive_file(name):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], name)
 
 if __name__ == "__main__":
     app.run()

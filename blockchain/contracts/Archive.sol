@@ -4,8 +4,12 @@ pragma experimental ABIEncoderV2;
 
 contract Archive {
     struct Entry {
-        // 0 = Style
-        // 1 = Style
+        // Kind:
+        // 00 = Head and Body
+        // 10 = External Style
+        // 20 = External Script
+        // 30 = PNG Image
+        // 31 = JPEG Image
         uint kind;
         string body;
     }
@@ -16,20 +20,25 @@ contract Archive {
     // URL => List of TIME
     mapping (string => uint256[]) public times;
 
-    function pushArchive(string memory _url, uint _kind, string memory _body) 
+    function pushArchive(string memory _url, uint _time, uint _kind, string memory _body) 
     public {
         Entry memory _entry = Entry({
             kind: _kind,
             body: _body
         });
 
-        archives[keccak256(abi.encode(block.timestamp, _url))] = _entry;
+        archives[keccak256(abi.encode(_time, _url))] = _entry;
 
-        times[_url].push(block.timestamp);
+        times[_url].push(_time);
     }
 
-    function getArchive(string memory _url, uint256 timestamp)
+    function getTimesOfArchive(string memory _url) 
+    public view returns (uint256[] memory) {
+        return times[_url];
+    }
+
+    function getArchive(string memory _url, uint256 _time)
     public view returns (Entry memory) {
-        return archives[keccak256(abi.encode(timestamp, _url))];
+        return archives[keccak256(abi.encode(_time, _url))];
     }
 }
