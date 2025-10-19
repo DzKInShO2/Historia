@@ -1,9 +1,3 @@
-const img_ext_to_kind = {
-    "png": 30,
-    "jpeg": 31,
-    "jpg": 31,
-};
-
 const getFullUrl = (web, url) => {
     let result = url;
     if (result?.[0] == '/') {
@@ -11,8 +5,8 @@ const getFullUrl = (web, url) => {
         result = `${base}${result}`;
     }
 
-    if (!result?.includes("https") || !result?.includes("http") || !result?.includes("ftp")) {
-         result = `${web}/${url}`;
+    if (!result?.includes("https") && !result?.includes("http") && !result?.includes("ftp")) {
+        result = `${web}/${url}`;
     }
 
     return result;
@@ -48,6 +42,30 @@ const unravelLinks = async (body, url, time) => {
     return result;
 }
 
+const unravelScripts = async (body, url, time) => {
+    const regex = /<script\s+([^>]*?)>/g;
+
+    let result = "";
+    let lastIndex = 0;
+    for (const match of body.matchAll(regex)) {
+        const [fullMatch, attrs] = match;
+        const matchStart = match.index;
+        const matchEnd = matchStart + fullMatch.length;
+
+        result += body.slice(lastIndex, matchStart);
+
+        const src = getFullUrl(url, attrs.match(/src=["']?([^"'\s>]+)["']?/)?.[1]);
+
+        const s = await getArchive(src, time);
+        result += `<script>\n${s}</script>`;
+
+        lastIndex = matchEnd;
+    }
+
+    result += body.slice(lastIndex);
+    return result;
+};
+
 const unravelImages = async (body, url, time) => {
     const regex = /<img\s+([^>]*?)>/g;
 
@@ -63,7 +81,7 @@ const unravelImages = async (body, url, time) => {
         const src = getFullUrl(url, attrs.match(/src=["']?([^"'\s>]+)["']?/)?.[1]);
 
         const i = await getArchive(src, time);
-        result += `<img src="/archive/${i}">`;
+        result += fullMatch.replace(/(.*?)src=".*?"(.*?)/, `$1src="/archive/${i}"$2`);
 
         lastIndex = matchEnd;
     }
@@ -98,40 +116,14 @@ const getArchive = async (url, time) => {
     if (archive.kind != 0) return archive.body;
 
     const title = archive.body.match(/<title>(.*)<\/title>/)?.[1];
-    document.title = `Historia - ${title}`
-
-    archive.body = archive.body.replace("<head", `<div style="display: none;"`);
-    archive.body = archive.body.replace("<body", `<div`);
-    archive.body = archive.body.replace("</head>", "</div>").replace("</body>", "</div>");
 
     archive.body = await unravelLinks(archive.body, url, time);
     archive.body = await unravelImages(archive.body, url, time);
+    archive.body = archive.body.replace("</head>", 
+                                        `<link rel="stylesheet" href="/static/styles/style.css">
+                                        </head>`);
 
-    return archive.body;
-
-    // contentHead = contentHead.replace(/<link\s+([^>]*?)>/g, (match, attrs) => {
-    //     const relMatch = attrs.match(/rel=["']?([^"'\s>]+)["']?/);
-    //     const typeMatch = attrs.match(/type=["']?([^"'\s>]+)["']?/);
-    //
-    //     let hrefMatch = attrs.match(/href=["']?([^"'\s>]+)["']?/);
-    //     if (relMatch[1] == "stylesheet" || typeMatch[1] == "text/css") {
-    //         hrefMatch = hrefMatch[1];
-    //         if (!hrefMatch.includes("https") || !hrefMatch.includes("http") || !hrefMatch.includes("ftp")) {
-    //             hrefMatch = web + hrefMatch;
-    //         }
-    //
-    //         return "<style>" + content.styles[hrefMatch] + "</style>";
-    //     }
-    // });
-    //
-    // contentBody = contentBody.replace(/<img\s+([^>]*?)>/g, (match, attrs) => {
-    //     let srcMatch = attrs.match(/src=["']?([^"'\s>]+)["']?/)[1];
-    //     if (!srcMatch.includes("https") || !srcMatch.includes("http") || !srcMatch.includes("ftp")) {
-    //         srcMatch = web + srcMatch;
-    //     }
-    //
-    //     return `<img src="data:image/png;base64,${content.images[srcMatch]}">`
-    // });
+    return [title, archive.body];
 }
 
 const archiveWeb_ = async (batch, url, time, kind) => {
@@ -154,7 +146,7 @@ const archiveWeb_ = async (batch, url, time, kind) => {
 
         const jason = await response.json();
         try {
-            batch.add(window.contract.methods.pushArchive(url, time, kind, jason.content).send({ from: window.account }));
+            window.contract.methods.pushArchive(url, time, kind, jason.content).send({ from: window.account });
         } catch (e) {
             console.warn(e.message);
         }
@@ -170,7 +162,7 @@ const archiveWeb_ = async (batch, url, time, kind) => {
         for (const l of links) {
             const rel  = l.match(/rel=["']?([^"'\s>]+)["']?/)?.[1];
             const type = l.match(/type=["']?([^"'\s>]+)["']?/)?.[1];
-            const href = getFullUrl(l.match(/href=["']?([^"'\s>]+)["']?/)?.[1]);
+            const href = getFullUrl(url, l.match(/href=["']?([^"'\s>]+)["']?/)?.[1]);
 
             if (rel == "stylesheet" || type == "text/css") {
                 await archiveWeb_(batch, href, time, 10);
@@ -178,19 +170,15 @@ const archiveWeb_ = async (batch, url, time, kind) => {
         }
 
         for (const s of scripts) {
-            let src  = s.match(/src=["']?([^"'\s>]+)["']?/)?.[1];
-
+            const src  = getFullUrl(url, s.match(/src=["']?([^"'\s>]+)["']?/)?.[1]);
             await archiveWeb_(batch, src, time, 20);
         }
 
         for (const i of images) {
-            let src  = i.match(/src=["']?([^"'\s>]+)["']?/)?.[1];
-
-            src = getFullUrl(url, src);
+            const src  = getFullUrl(url, i.match(/src=["']?([^"'\s>]+)["']?/)?.[1]);
 
             const ext = src.split(".").at(-1);
-            const kind = img_ext_to_kind[ext];
-            await archiveWeb_(batch, src, time, kind);
+            await archiveWeb_(batch, src, time, 30);
         }
     } catch (e) {
         console.error(e);
@@ -201,9 +189,11 @@ const archiveWeb = async (url, time, kind) => {
     let batch = new web3.BatchRequest();
 
     await archiveWeb_(batch, url, time, kind);
-    await batch.execute();
-
-    window.location.reload();
+    try {
+        await batch.execute();
+    } catch (e) {
+        console.warn(e.message);
+    }
 }
 
 window.onload = async () => {
@@ -236,8 +226,9 @@ window.onload = async () => {
     }
 
     if (time != null && time != undefined) {
-        const body = await getArchive(web, time);
-        contentEl.innerHTML = body;
+        const [ title, content ] = await getArchive(web, time);
+        document.write(content);
+        document.title = `Historia - ${title}`;
         return;
     }
 
@@ -245,12 +236,16 @@ window.onload = async () => {
     if (archiveTimes && archiveTimes.length > 1) {
         const renewEl = document.createElement("div");
         renewEl.innerHTML = `
-        <h2>Want to create more <a href="${web}">${web}</a> archive?</h2>
-        <button onclick="archiveWeb\('${web}'\, ${Date.now()}, 0)">Archive it!</button>
+        <div class="historia-content">
+            <h2>Want to create more <a href="${web}">${web}</a> archive?</h2>
+            <button onclick="archiveWeb\('${web}'\, ${Date.now()}, 0)">Archive it!</button>
+        </div>
         `
 
         const timesEl = document.createElement("div");
-        for (const t of archiveTimes) {
+        timesEl.className = "historia-times-scroll";
+        for (let i = archiveTimes.length - 1; i >= 0; i--) {
+            const t = archiveTimes[i];
             const time = new Date(Number(t));
 
             const timeEl = document.createElement("button");
@@ -267,7 +262,7 @@ window.onload = async () => {
     } else {
         if (contentEl) {
             contentEl.innerHTML = `
-                <div>
+                <div class="historia-content">
                     <h2>Archive for <a href="${web}">${web}</a> is not found</h2>
                     <h3>Do you want to archive it now?</h3>
                     <button onclick="archiveWeb\('${web}'\, ${Date.now()}, 0)">Archive it</button>

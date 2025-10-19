@@ -10,13 +10,17 @@
         <!-- Vendor Scripts -->
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.0/dist/cdn.min.js"></script>
     </head>
-    <body>
-        <h1>Historia</h1>
-        <h3>History of the web at your finger tip</h3>
+    <body class="historia-body">
+        <div class="historia-content-root">
+            <h1 class="historia-title">Historia</h1>
+            <h3 class="historia-subtitle">History of the web at your finger tip</h3>
 
-        <form method="GET" action="/archive">
-            <input type="text" id="web" name="web">
-            <button>Search</button>
-        </form>
+            <form method="GET" action="/archive" class="historia-searchbar">
+                <input type="text" id="web" name="web">
+                <button>
+                    Search
+                </button>
+            </form>
+        </div>
     </body>
 </html>

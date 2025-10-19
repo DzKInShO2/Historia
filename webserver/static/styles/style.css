@@ -1,0 +1,105 @@
+.historia-body {
+}
+
+.historia-content-root {
+    margin: auto;
+    display: flex;
+
+    margin-top: 256px;
+
+    gap: 8px;
+    align-items: center;
+    flex-direction: column;
+
+    width: 720px;
+}
+
+.historia-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.historia-content > button {
+    width: 120px;
+    height: 24px;
+}
+
+.historia-title {
+    margin: 16px;
+    font-size: 24pt;
+}
+
+.historia-subtitle {
+    font-size: 10pt;
+}
+
+.historia-searchbar {
+    margin: 64px;
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+    gap: 0px;
+
+    width: 640px;
+    height: 36px;
+}
+
+.historia-searchbar > input[type=text] {
+    height: 100%;
+    width: 480px;
+
+    border: none;
+    outline: none;
+
+    padding: 12px;
+    box-sizing: border-box;
+
+    background: #E2E2E2;
+}
+
+.historia-searchbar > input[type=text]:hover {
+    background: #D2D2D2;
+}
+
+.historia-searchbar > button {
+    height: 100%;
+    width: 96px;
+
+    border: none;
+    outline: none;
+}
+
+.historia-times-scroll {
+    height: 240px;
+    width: 360px;
+
+    overflow-y: scroll;
+    overflow-x: clip;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+
+    padding: 12px;
+    box-sizing: border-box;
+    margin: 32px;
+}
+
+.historia-times-scroll > button {
+    width: 240px;
+
+    outline: none;
+    border: none;
+
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+
+.historia-times-scroll > button:hover {
+    background: #AFAFAF;
+}

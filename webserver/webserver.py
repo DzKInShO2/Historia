@@ -13,6 +13,7 @@ from flask import (
 import requests
 from bs4 import BeautifulSoup
 
+HEADERS = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36"
 UPLOAD_FOLDER = "uploads"
 
 app = Flask(__name__, template_folder=os.path.abspath("pages"))
